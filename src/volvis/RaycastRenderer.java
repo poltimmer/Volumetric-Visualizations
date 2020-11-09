@@ -178,7 +178,64 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
     private short getVoxelTrilinear(double[] coord) {
         // TODO 1: Implement Tri-Linear interpolation and use it in your code
         // instead of getVoxel().
-        return 0;
+        
+        // Get coordinates
+        double dx = coord[0], dy = coord[1], dz = coord[2];
+        
+        //First we acquire the ceilings and floors, later used to index the correct
+        //voxels.
+        
+        int xFloor = (int) Math.floor(dx);
+        int yFloor = (int) Math.floor(dy);
+        int zFloor = (int) Math.floor(dz);
+        int xCeil  = (int) Math.ceil(dx);
+        int yCeil  = (int) Math.ceil(dy);
+        int zCeil  = (int) Math.ceil(dz); 
+        
+        //We do the same checks that are conducted in the getVoxel that floors
+        //coordinates. But now a little bit altered so we can use ceiling commands
+        
+        // Verify they are inside the volume
+        if (xFloor < 0 || xCeil >= volume.getDimX() || yFloor < 0 || yCeil >= volume.getDimY()
+                || zFloor < 0 || zCeil >= volume.getDimZ()) {
+
+            // If not, jus return 0
+            return 0;
+        }
+
+        //To do tri-linear interpolation we have to acquire the value of the 8 surrounding
+        //actual voxels and linear interpolate over every axis. So first we take the
+        //8 values and name them the same as in sheet 2 of the sheet set 2-spatial.
+        
+        
+        
+        short x0 = volume.getVoxel(xFloor,yFloor,zFloor);
+        short x1 = volume.getVoxel(xCeil,yFloor,zFloor);
+        short x2 = volume.getVoxel(xFloor,yCeil,zFloor);
+        short x3 = volume.getVoxel(xCeil,yCeil,zFloor);
+        short x4 = volume.getVoxel(xFloor,yFloor,zCeil);
+        short x5 = volume.getVoxel(xCeil,yFloor,zCeil);
+        short x6 = volume.getVoxel(xFloor,yCeil,zCeil);
+        short x7 = volume.getVoxel(xCeil,yCeil,zCeil);
+        
+        //Now we acquire alpha for x, beta for y and gamma for the z acces which is a
+        //The distance from x0 for every axes
+        
+        double alpha = dx - Math.floor(dx);
+        double beta  = dy - Math.floor(dy);
+        double gamma = dz - Math.floor(dz);
+        
+        //now we just copy the formula from the sheet. note that shorts are widened to
+        //accommodate the double multiplacations, but we can always cast back afterwards
+        
+        
+        double S = (1-alpha)*(1-beta)*(1-gamma)*x0 + alpha*(1-beta)*(1-gamma)*x1
+                  +(1-alpha)*beta*(1-gamma)*x2 + alpha*beta*(1-gamma)*x3
+                  +(1-alpha)*(1-beta)*gamma*x4 + alpha*(1-beta)*gamma*x5
+                  +(1-alpha)*beta*gamma*x6 + alpha*beta*gamma*x7;
+        
+        return (short) S;
+        
     }
 
     /**
@@ -270,9 +327,9 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                 // computes the pixelCoord which contains the 3D coordinates of the pixels (i,j)
                 computePixelCoordinatesFloat(pixelCoord, volumeCenter, uVec, vVec, i, j);
 
-                int val = getVoxel(pixelCoord);
+                //int val = getVoxel(pixelCoord);
                 //NOTE: you have to implement this function to get the tri-linear interpolation
-                //int val = getVoxelTrilinear(pixelCoord);
+                int val = getVoxelTrilinear(pixelCoord);
 
                 // Map the intensity to a grey value by linear scaling
                 pixelColor.r = val / max;
@@ -318,7 +375,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
 
         double maximum = 0;
         do {
-            double value = getVoxel(currentPos) / 255.;
+            double value = getVoxelTrilinear(currentPos) / 255.;
             if (value > maximum) {
                 maximum = value;
             }
