@@ -468,12 +468,54 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         switch (modeFront) {
             case COMPOSITING:
                 // 1D transfer function 
-                voxel_color.r = 1;
-                voxel_color.g = 0;
-                voxel_color.b = 0;
-                voxel_color.a = 1;
-                opacity = 1;
+                
+                //first we copy most of the max implementation for getting increment vector and nrsamples
+                
+                //compute the increment and the number of samples
+                double[] increments = new double[3];
+                VectorMath.setVector(increments, rayVector[0] * sampleStep, rayVector[1] * sampleStep, rayVector[2] * sampleStep);
+
+                // Compute the number of times we need to sample
+                //double distance = VectorMath.distance(entryPoint, exitPoint); // is not used
+                int nrSamples = 1 + (int) Math.floor(VectorMath.distance(entryPoint, exitPoint) / sampleStep);
+
+                //the current position is initialized as the furtherst point and we work back to the current point
+                
+                double[] currentPos = new double[3];
+                VectorMath.setVector(currentPos, exitPoint[0], exitPoint[1], exitPoint[2]);
+                
+                //set all colors to zero so background will be black when no data points are passed or only a few.
+                voxel_color.r = 0.0;
+                voxel_color.g = 0.0;
+                voxel_color.b = 0.0;
+                
+                
+                do {
+                    short foundValue = getVoxelTrilinear(currentPos);
+                    TFColor foundColor = tFuncFront.getColor(foundValue);
+                    
+                    double tau = foundColor.a;
+                    //doing the actual composition work per color
+                    voxel_color.r = tau * foundColor.r + (1-tau)*voxel_color.r;
+                    voxel_color.g = tau * foundColor.g + (1-tau)*voxel_color.g;
+                    voxel_color.b = tau * foundColor.b + (1-tau)*voxel_color.b;
+                    //set step towards the entry point
+                    for (int i = 0; i < 3; i++) {
+                        currentPos[i] -= increments[i];
+                    }
+                    nrSamples--;
+                } while (nrSamples > 0);
+                
+                // if there is no color make the voxel transparent
+                if (voxel_color.r > 0.0 || voxel_color.g > 0.0 || voxel_color.b > 0.0) { 
+                    opacity = 1.0;
+                } else {
+                    opacity = 0.0;
+                }
+                
                 break;
+                
+                
             case TRANSFER2D:
                 // 2D transfer function 
                 voxel_color.r = 0;
