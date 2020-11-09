@@ -581,10 +581,19 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
 
         // TODO 5: Limited modification is needed
         // increment in the pixel domain in pixel units
+        
         int increment = 1;
         // sample step in voxel units
         int sampleStep = 1;
-
+        
+        //if we are interacting with the model we use more coarse settings
+        if(interactiveMode)
+        {
+            increment = 3;
+            
+            sampleStep = 3;
+        }
+        
         // reset the image to black
         resetImage();
 
