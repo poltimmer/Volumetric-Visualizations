@@ -54,7 +54,22 @@ public class GradientVolume {
      */
     private void compute() {
         // TODO 4: Implement gradient computation.
-        // this just initializes all gradients to the vector (0,0,0)
+        
+        //loop over all gradients and determine them we ignore the outside border, because we cannot determine them
+        for(int i=1; i< dimX-1;i++){
+            for(int j=1; j< dimX-1;j++){
+                for(int k=1; k< dimX-1;k++){
+                    VoxelGradient currentGradient = getGradient(i,j,k);
+                    //use 0.5 as float, double precision is not saved
+                    currentGradient.x = (float) 0.5*(volume.getVoxel(i+1,j,k)-volume.getVoxel(i-1,j,k));
+                    currentGradient.y = (float) 0.5*(volume.getVoxel(i,j+1,k)-volume.getVoxel(i,j-1,k));
+                    currentGradient.z = (float) 0.5*(volume.getVoxel(i,j,k+1)-volume.getVoxel(i,j,k-1));
+                    
+                }
+            }
+        }
+        
+        
         for (int i = 0; i < data.length; i++) {
             data[i] = zero;
         }
