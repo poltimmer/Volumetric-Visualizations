@@ -422,12 +422,74 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         r = g = b = 0.0;
         double alpha = 0.0;
         double opacity = 0;
+        
+        
+        //compute the increment and the number of samples
+        double[] increments = new double[3];
+        VectorMath.setVector(increments, rayVector[0] * sampleStep, rayVector[1] * sampleStep, rayVector[2] * sampleStep);
 
-        // isoColorFront contains the isosurface color from the GUI
-        r = isoColorFront.r;
-        g = isoColorFront.g;
-        b = isoColorFront.b;
-        alpha = 1.0;
+        // Compute the number of times we need to sample
+        //double distance = VectorMath.distance(entryPoint, exitPoint); // is not used
+        int nrSamples = 1 + (int) Math.floor(VectorMath.distance(entryPoint, exitPoint) / sampleStep);
+
+        //the current position is initialized as the closest point and we work back to the furthest point
+        double[] currentPos = new double[3];
+        VectorMath.setVector(currentPos, entryPoint[0], entryPoint[1], entryPoint[2]);
+        
+        //Now we want to detect a surface so we first see if we are below or above it.
+        //If we are below it we are looking for a rising edge
+        
+        short firstValue = getVoxelTrilinear(currentPos);
+        boolean surfaceFound = false;
+        
+        //We can detect the transion from below to above. But of course the first all values
+        //can have the isovalue, in which case we would not detect it, so we check seperately.
+        if(firstValue == isoValueFront)
+        {
+            surfaceFound = true;
+        }
+        else
+        {
+            boolean potentialRisingEdge = firstValue < isoValueFront;
+        
+            //set single step, otherwise we would check the same position
+            for (int i = 0; i < 3; i++) {
+                currentPos[i] += increments[i];
+            }
+            nrSamples--;
+        
+            //keep going untill we found surface or we have seen all samples
+            while(nrSamples > 0 && !surfaceFound) {  
+            
+                //see if we can see an transion, works only when going through the surface
+                if(potentialRisingEdge)
+                {
+                    surfaceFound = getVoxelTrilinear(currentPos) >= isoValueFront;
+
+                }
+                else
+                {
+                    surfaceFound = getVoxelTrilinear(currentPos) < isoValueFront;
+                
+                }
+            
+                //set step towards the entry point
+                for (int i = 0; i < 3; i++) {
+                    currentPos[i] += increments[i];
+                }
+                nrSamples--;
+            }
+        }
+        
+        if(surfaceFound)
+        {
+            // isoColorFront contains the isosurface color from the GUI
+            r = isoColorFront.r;
+            g = isoColorFront.g;
+            b = isoColorFront.b;
+            alpha = 1.0;  
+        }
+              
         //computes the color
         int color = computePackedPixelColor(r, g, b, alpha);
         return color;
