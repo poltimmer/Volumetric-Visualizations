@@ -543,9 +543,15 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         {
             // isoColorFront contains the isosurface color from the GUI
             
-            VoxelGradient gradient = getGradientTrilinear(currentPos);
+            TFColor color = isoColorFront;
             
-            TFColor color = computePhongShading(isoColorFront,gradient,lightVector,rayVector);
+            if(shadingMode)
+            {
+                VoxelGradient gradient = getGradientTrilinear(currentPos);
+            
+                color = computePhongShading(isoColorFront,gradient,lightVector,rayVector);
+            }
+        
             
             r = color.r;
             g = color.g;
@@ -589,6 +595,8 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
 
         TFColor voxel_color = new TFColor();
         TFColor colorAux = new TFColor();
+        
+        VoxelGradient voxel_gradient = new VoxelGradient();
 
         // TODO 2: To be Implemented this function. Now, it just gives back a constant color depending on the mode
         switch (modeFront) {
@@ -620,11 +628,23 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                     short foundValue = getVoxelTrilinear(currentPos);
                     TFColor foundColor = tFuncFront.getColor(foundValue);
                     
-                    double tau = foundColor.a;
+                    double tauD = foundColor.a;
+                    float tauF = (float) foundColor.a;
                     //doing the actual composition work per color
-                    voxel_color.r = tau * foundColor.r + (1-tau)*voxel_color.r;
-                    voxel_color.g = tau * foundColor.g + (1-tau)*voxel_color.g;
-                    voxel_color.b = tau * foundColor.b + (1-tau)*voxel_color.b;
+                    voxel_color.r = tauD * foundColor.r + (1-tauD)*voxel_color.r;
+                    voxel_color.g = tauD * foundColor.g + (1-tauD)*voxel_color.g;
+                    voxel_color.b = tauD * foundColor.b + (1-tauD)*voxel_color.b;
+                    
+                    if(shadingMode)
+                    {
+                    
+                        VoxelGradient foundGradient = getGradientTrilinear(currentPos);
+                    
+                        voxel_gradient.x = tauF * foundGradient.x + (1-tauF)*voxel_gradient.x;
+                        voxel_gradient.y = tauF * foundGradient.y + (1-tauF)*voxel_gradient.y;
+                        voxel_gradient.z = tauF * foundGradient.z + (1-tauF)*voxel_gradient.z;
+                    }
+                    
                     //set step towards the entry point
                     for (int i = 0; i < 3; i++) {
                         currentPos[i] -= increments[i];
@@ -654,11 +674,8 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
 
         if (shadingMode) {
             // Shading mode on
-            voxel_color.r = 1;
-            voxel_color.g = 0;
-            voxel_color.b = 1;
-            voxel_color.a = 1;
-            opacity = 1;
+            voxel_gradient.mag = (float) Math.sqrt((voxel_gradient.x*voxel_gradient.x)+(voxel_gradient.y*voxel_gradient.y)+(voxel_gradient.z*voxel_gradient.z));
+            voxel_color = computePhongShading(voxel_color,voxel_gradient,lightVector,rayVector);
         }
 
         r = voxel_color.r;
@@ -694,7 +711,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         float nY = gradient.y/gradient.mag;
         float nZ = gradient.z/gradient.mag;
         
-        double iDiff = kD * ((lightVector[0] * nX) + (lightVector[1] * nY)+(lightVector[2] * nZ));
+        double iDiff = kD * ((lightVector[0] * nX) + (lightVector[1] * nY)+(lightVector[2] * nZ)); //dotproduct n . light
         
         //r=d−2(d⋅n)n
         
