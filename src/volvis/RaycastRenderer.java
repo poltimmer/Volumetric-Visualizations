@@ -274,7 +274,70 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
      */
     private VoxelGradient getGradientTrilinear(double[] coord) {
         // TODO 6: Implement Tri-linear interpolation for gradients
-        return ZERO_GRADIENT;
+        // This is a near copy of the getVoxelTrilinear but now computed on gradients
+        
+        // Get the coordinates, subtract one so we align with volume coordinate values
+        // however this is ignored in other gradient calculation so we ignore aswell here
+        double dx = coord[0], dy = coord[1], dz = coord[2];
+        
+        
+        //First we acquire the ceilings and floors, later used to index the correct
+        //voxels.
+        
+        int xFloor = (int) Math.floor(dx);
+        int yFloor = (int) Math.floor(dy);
+        int zFloor = (int) Math.floor(dz);
+        int xCeil  = (int) Math.ceil(dx);
+        int yCeil  = (int) Math.ceil(dy);
+        int zCeil  = (int) Math.ceil(dz); 
+
+        // Verify they are inside the volume gradient
+        if (xFloor < 0 || xCeil > (gradients.getDimX() - 2) || yFloor < 0 || yCeil > (gradients.getDimY() - 2)
+                || zFloor < 0 || zCeil > (gradients.getDimZ() - 2)) {
+
+            // If not, just return a zero gradient
+            return ZERO_GRADIENT;
+        }
+
+        //To do tri-linear interpolation we have to acquire the value of the 8 surrounding
+        //actual voxels and linear interpolate over every axis. So first we take the
+        //8 values and name them the same as in sheet 2 of the sheet set 2-spatial.
+        VoxelGradient x0 = gradients.getGradient(xFloor,yFloor,zFloor);
+        VoxelGradient x1 = gradients.getGradient(xCeil,yFloor,zFloor);
+        VoxelGradient x2 = gradients.getGradient(xFloor,yCeil,zFloor);
+        VoxelGradient x3 = gradients.getGradient(xCeil,yCeil,zFloor);
+        VoxelGradient x4 = gradients.getGradient(xFloor,yFloor,zCeil);
+        VoxelGradient x5 = gradients.getGradient(xCeil,yFloor,zCeil);
+        VoxelGradient x6 = gradients.getGradient(xFloor,yCeil,zCeil);
+        VoxelGradient x7 = gradients.getGradient(xCeil,yCeil,zCeil);
+        
+        //Now we acquire alpha for x, beta for y and gamma for the z acces which is a
+        //The distance from x0 for every axes
+        
+        float alpha = (float) (dx - Math.floor(dx));
+        float beta  = (float) (dy - Math.floor(dy));
+        float gamma = (float) (dz - Math.floor(dz));
+        
+        //now we just copy the formula from the sheet. note that shorts are widened to
+        //accommodate the double multiplacations, but we can always cast back afterwards
+        
+        
+        float xGradient = (1-alpha)*(1-beta)*(1-gamma)*x0.x + alpha*(1-beta)*(1-gamma)*x1.x
+                            +(1-alpha)*beta*(1-gamma)*x2.x + alpha*beta*(1-gamma)*x3.x
+                            +(1-alpha)*(1-beta)*gamma*x4.x + alpha*(1-beta)*gamma*x5.x
+                            +(1-alpha)*beta*gamma*x6.x + alpha*beta*gamma*x7.x;
+        
+        float yGradient = (1-alpha)*(1-beta)*(1-gamma)*x0.y + alpha*(1-beta)*(1-gamma)*x1.y
+                            +(1-alpha)*beta*(1-gamma)*x2.y + alpha*beta*(1-gamma)*x3.y
+                            +(1-alpha)*(1-beta)*gamma*x4.y + alpha*(1-beta)*gamma*x5.y
+                            +(1-alpha)*beta*gamma*x6.y + alpha*beta*gamma*x7.y;
+        
+        float zGradient = (1-alpha)*(1-beta)*(1-gamma)*x0.z + alpha*(1-beta)*(1-gamma)*x1.z
+                            +(1-alpha)*beta*(1-gamma)*x2.z + alpha*beta*(1-gamma)*x3.z
+                            +(1-alpha)*(1-beta)*gamma*x4.z + alpha*(1-beta)*gamma*x5.z
+                            +(1-alpha)*beta*gamma*x6.z + alpha*beta*gamma*x7.z;
+        
+        return new VoxelGradient(xGradient,yGradient,zGradient);
     }
 
     /**
