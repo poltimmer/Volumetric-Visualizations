@@ -648,9 +648,14 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                             val = traceRayIso(entryPoint, exitPoint, rayVector, sampleStep);
                             break;
                     }
-                    for (int ii = i; ii < i + increment; ii++) {
-                        for (int jj = j; jj < j + increment; jj++) {
-                            image.setRGB(ii, jj, val);
+                    //when going low resolution there is the possiblily you draw outside the box, this is prevented.
+                    //The pixels are not drawn, in normal mode this does not occur
+                    if(i+increment<imageW && j+increment<imageH)
+                    {
+                        for (int ii = i; ii < i + increment; ii++) {
+                            for (int jj = j; jj < j + increment; jj++) {
+                                image.setRGB(ii, jj, val);
+                            }
                         }
                     }
                 }
