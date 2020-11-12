@@ -515,15 +515,16 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         {
             boolean potentialRisingEdge = firstValue < isoValueFront;
         
-            //set single step, otherwise we would check the same position
-            for (int i = 0; i < 3; i++) {
-                currentPos[i] += increments[i];
-            }
-            nrSamples--;
         
             //keep going untill we found surface or we have seen all samples
-            while(nrSamples > 0 && !surfaceFound) {  
-            
+            while(nrSamples > 1 && !surfaceFound) {  
+                
+                //set step
+                for (int i = 0; i < 3; i++) {
+                    currentPos[i] += increments[i];
+                }
+                nrSamples--;
+                
                 //see if we can see an transion, works only when going through the surface
                 if(potentialRisingEdge)
                 {
@@ -533,23 +534,23 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                 else
                 {
                     surfaceFound = getVoxelTrilinear(currentPos) < isoValueFront;
+                }
                 
-                }
-            
-                //set step towards the entry point
-                for (int i = 0; i < 3; i++) {
-                    currentPos[i] += increments[i];
-                }
-                nrSamples--;
             }
         }
         
         if(surfaceFound)
         {
             // isoColorFront contains the isosurface color from the GUI
-            r = isoColorFront.r;
-            g = isoColorFront.g;
-            b = isoColorFront.b;
+            
+            VoxelGradient gradient = getGradientTrilinear(currentPos);
+            
+            TFColor color = computePhongShading(isoColorFront,gradient,lightVector,rayVector);
+            
+            r = color.r;
+            g = color.g;
+            b = color.b;
+            
             alpha = 1.0;  
         }
               
@@ -682,9 +683,41 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
      */
     private TFColor computePhongShading(TFColor voxel_color, VoxelGradient gradient, double[] lightVector,
             double[] rayVector) {
-
+        
+        double kA = 0.1;
+        double kD = 0.7;
+        double kS = 0.2;
+        
+        int alpha = 100;
+        
+        float nX = gradient.x/gradient.mag;
+        float nY = gradient.y/gradient.mag;
+        float nZ = gradient.z/gradient.mag;
+        
+        double iDiff = kD * ((lightVector[0] * nX) + (lightVector[1] * nY)+(lightVector[2] * nZ));
+        
+        //r=d−2(d⋅n)n
+        
+        double dn = (lightVector[0]*nX) + (lightVector[1]*nY) + (lightVector[2]*nZ);
+        
+        double rX = lightVector[0] - 2*dn*nX;
+        double rY = lightVector[1] - 2*dn*nY;
+        double rZ = lightVector[2] - 2*dn*nZ;
+        
+        
+        double iSpec = kS * Math.pow(((rayVector[0] * rX) +(rayVector[1] * rY) + (rayVector[2] * rZ) ),alpha);
+        
+        //color of ambient light is black 0
+        //color of spectral light is 1
+                
+        double red = 0 * kA + voxel_color.r * iDiff + 1 * iSpec;
+        double green = 0 * kA + voxel_color.g * iDiff + 1 * iSpec;
+        double blue = 0 * kA + voxel_color.b * iDiff + 1 * iSpec;
+        
+        
+        
         // TODO 7: Implement Phong Shading.
-        TFColor color = new TFColor(0, 0, 0, 1);
+        TFColor color = new TFColor(red, green, blue, 1);
 
         return color;
     }
