@@ -596,92 +596,111 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         TFColor voxel_color = new TFColor();
         TFColor colorAux = new TFColor();
         
-        VoxelGradient voxel_gradient = new VoxelGradient();
+        VoxelGradient voxel_gradient = new VoxelGradient();      
+        
+        //first we copy most of the max implementation for getting increment vector and nrsamples
+                
+        //compute the increment and the number of samples
+        double[] increments = new double[3];
+        VectorMath.setVector(increments, rayVector[0] * sampleStep, rayVector[1] * sampleStep, rayVector[2] * sampleStep);
 
-        // TODO 2: To be Implemented this function. Now, it just gives back a constant color depending on the mode
-        switch (modeFront) {
+        // Compute the number of times we need to sample
+        //double distance = VectorMath.distance(entryPoint, exitPoint); // is not used
+        int nrSamples = 1 + (int) Math.floor(VectorMath.distance(entryPoint, exitPoint) / sampleStep);
+
+        //the current position is initialized as the furtherst point and we work back to the current point
+                
+        double[] currentPos = new double[3];
+        VectorMath.setVector(currentPos, exitPoint[0], exitPoint[1], exitPoint[2]);
+                
+        //set all colors to zero so background will be black when no data points are passed or only a few.
+        voxel_color.r = 0.0;
+        voxel_color.g = 0.0;
+        voxel_color.b = 0.0;
+        
+        colorAux.r = 0.0;
+        colorAux.g = 0.0;
+        colorAux.b = 0.0;
+        colorAux.a = 0.0;
+                
+                
+        do {
+            short foundValue = getVoxelTrilinear(currentPos);
+            VoxelGradient foundGradient = getGradientTrilinear(currentPos);
+            TFColor foundColor;
+            
+            // TODO 2: To be Implemented this function. Now, it just gives back a constant color depending on the mode
+            switch (modeFront) {
             case COMPOSITING:
                 // 1D transfer function 
-                
-                //first we copy most of the max implementation for getting increment vector and nrsamples
-                
-                //compute the increment and the number of samples
-                double[] increments = new double[3];
-                VectorMath.setVector(increments, rayVector[0] * sampleStep, rayVector[1] * sampleStep, rayVector[2] * sampleStep);
-
-                // Compute the number of times we need to sample
-                //double distance = VectorMath.distance(entryPoint, exitPoint); // is not used
-                int nrSamples = 1 + (int) Math.floor(VectorMath.distance(entryPoint, exitPoint) / sampleStep);
-
-                //the current position is initialized as the furtherst point and we work back to the current point
-                
-                double[] currentPos = new double[3];
-                VectorMath.setVector(currentPos, exitPoint[0], exitPoint[1], exitPoint[2]);
-                
-                //set all colors to zero so background will be black when no data points are passed or only a few.
-                voxel_color.r = 0.0;
-                voxel_color.g = 0.0;
-                voxel_color.b = 0.0;
-                
-                
-                do {
-                    short foundValue = getVoxelTrilinear(currentPos);
-                    TFColor foundColor = tFuncFront.getColor(foundValue);
-                    
-                    double tauD = foundColor.a;
-                    float tauF = (float) foundColor.a;
-                    //doing the actual composition work per color
-                    voxel_color.r = tauD * foundColor.r + (1-tauD)*voxel_color.r;
-                    voxel_color.g = tauD * foundColor.g + (1-tauD)*voxel_color.g;
-                    voxel_color.b = tauD * foundColor.b + (1-tauD)*voxel_color.b;
-                    
-                    if(shadingMode)
-                    {
-                    
-                        VoxelGradient foundGradient = getGradientTrilinear(currentPos);
-                    
-                        voxel_gradient.x = tauF * foundGradient.x + (1-tauF)*voxel_gradient.x;
-                        voxel_gradient.y = tauF * foundGradient.y + (1-tauF)*voxel_gradient.y;
-                        voxel_gradient.z = tauF * foundGradient.z + (1-tauF)*voxel_gradient.z;
-                    }
-                    
-                    //set step towards the entry point
-                    for (int i = 0; i < 3; i++) {
-                        currentPos[i] -= increments[i];
-                    }
-                    nrSamples--;
-                } while (nrSamples > 0);
-                
-                // if there is no color make the voxel transparent
-                if (voxel_color.r > 0.0 || voxel_color.g > 0.0 || voxel_color.b > 0.0) { 
-                    opacity = 1.0;
-                } else {
-                    opacity = 0.0;
-                }
+                foundColor = tFuncFront.getColor(foundValue);
                 
                 break;
                 
                 
             case TRANSFER2D:
                 // 2D transfer function 
-                voxel_color.r = 0;
-                voxel_color.g = 1;
-                voxel_color.b = 0;
-                voxel_color.a = 1;
-                opacity = 1;
+                
+                                
+                float gradientTreshold = (float) (((Math.abs(foundValue-tFunc2DFront.baseIntensity)/tFunc2DFront.radius))*gradients.getMaxGradientMagnitude());
+              
+                foundGradient.computeMag();
+                
+                if (foundGradient.mag> gradientTreshold)
+                {
+                   foundColor = tFunc2DFront.color;         
+                }
+                else
+                {
+                    foundColor = colorAux; //set to zero
+                }
+
+                
                 break;
+                
+            default:
+                
+                throw new IllegalArgumentException("ModeFront not recognized");
+            }
+                    
+            double tauD = foundColor.a;
+            float tauF = (float) foundColor.a;
+            //doing the actual composition work per color
+            voxel_color.r = tauD * foundColor.r + (1-tauD)*voxel_color.r;
+            voxel_color.g = tauD * foundColor.g + (1-tauD)*voxel_color.g;
+            voxel_color.b = tauD * foundColor.b + (1-tauD)*voxel_color.b;
+                    
+            if(shadingMode)
+            {
+                voxel_gradient.x = tauF * foundGradient.x + (1-tauF)*voxel_gradient.x;
+                voxel_gradient.y = tauF * foundGradient.y + (1-tauF)*voxel_gradient.y;
+                voxel_gradient.z = tauF * foundGradient.z + (1-tauF)*voxel_gradient.z;
+            }
+                    
+            //set step towards the entry point
+            for (int i = 0; i < 3; i++) {
+                currentPos[i] -= increments[i];
+            }
+            nrSamples--;
+        } while (nrSamples > 0);
+             
+        // if there is no color make the voxel transparent
+        if (voxel_color.r > 0.0 || voxel_color.g > 0.0 || voxel_color.b > 0.0) { 
+            voxel_color.a = 1.0;
+        } else {
+            voxel_color.a = 0.0;
         }
 
         if (shadingMode) {
             // Shading mode on
-            voxel_gradient.mag = (float) Math.sqrt((voxel_gradient.x*voxel_gradient.x)+(voxel_gradient.y*voxel_gradient.y)+(voxel_gradient.z*voxel_gradient.z));
+            voxel_gradient.computeMag();
             voxel_color = computePhongShading(voxel_color,voxel_gradient,lightVector,rayVector);
         }
 
         r = voxel_color.r;
         g = voxel_color.g;
         b = voxel_color.b;
-        alpha = opacity;
+        alpha = voxel_color.a;
 
         //computes the color
         int color = computePackedPixelColor(r, g, b, alpha);
@@ -730,11 +749,11 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         double red = 0 * kA + voxel_color.r * iDiff + 1 * iSpec;
         double green = 0 * kA + voxel_color.g * iDiff + 1 * iSpec;
         double blue = 0 * kA + voxel_color.b * iDiff + 1 * iSpec;
-        
+       
         
         
         // TODO 7: Implement Phong Shading.
-        TFColor color = new TFColor(red, green, blue, 1);
+        TFColor color = new TFColor(red, green, blue, voxel_color.a );
 
         return color;
     }
