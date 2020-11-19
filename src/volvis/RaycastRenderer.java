@@ -617,6 +617,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         voxel_color.r = 0.0;
         voxel_color.g = 0.0;
         voxel_color.b = 0.0;
+        voxel_color.b = 1.0;
         
         colorAux.r = 0.0;
         colorAux.g = 0.0;
@@ -634,26 +635,17 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
             case COMPOSITING:
                 // 1D transfer function 
                 foundColor = tFuncFront.getColor(foundValue);
-                
+                opacity = foundColor.a;
                 break;
                 
                 
             case TRANSFER2D:
                 // 2D transfer function 
                 
-                                
-                float gradientTreshold = (float) (((Math.abs(foundValue-tFunc2DFront.baseIntensity)/tFunc2DFront.radius))*gradients.getMaxGradientMagnitude());
-              
+               
+                foundColor = tFunc2DFront.color;
                 foundGradient.computeMag();
-                
-                if (foundGradient.mag> gradientTreshold)
-                {
-                   foundColor = tFunc2DFront.color;         
-                }
-                else
-                {
-                    foundColor = colorAux; //set to zero
-                }
+                opacity = foundColor.a*computeOpacity2DTF(tFunc2DFront.baseIntensity,tFunc2DFront.radius,foundValue,foundGradient.mag); 
 
                 
                 break;
@@ -669,6 +661,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
             voxel_color.r = tauD * foundColor.r + (1-tauD)*voxel_color.r;
             voxel_color.g = tauD * foundColor.g + (1-tauD)*voxel_color.g;
             voxel_color.b = tauD * foundColor.b + (1-tauD)*voxel_color.b;
+            voxel_color.a = voxel_color.a*(1-opacity);
                     
             if(shadingMode)
             {
@@ -684,12 +677,6 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
             nrSamples--;
         } while (nrSamples > 0);
              
-        // if there is no color make the voxel transparent
-        if (voxel_color.r > 0.0 || voxel_color.g > 0.0 || voxel_color.b > 0.0) { 
-            voxel_color.a = 1.0;
-        } else {
-            voxel_color.a = 0.0;
-        }
 
         if (shadingMode) {
             // Shading mode on
@@ -700,7 +687,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         r = voxel_color.r;
         g = voxel_color.g;
         b = voxel_color.b;
-        alpha = voxel_color.a;
+        alpha = 1-voxel_color.a;
 
         //computes the color
         int color = computePackedPixelColor(r, g, b, alpha);
@@ -743,6 +730,15 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         
         double iSpec = kS * Math.pow(((rayVector[0] * rX) +(rayVector[1] * rY) + (rayVector[2] * rZ) ),alpha);
         
+        if(iSpec<0)//prevent negative values
+        {
+            iSpec =0;
+        }
+        
+        if(iDiff<0)
+        {
+            iDiff = 0;
+        }
         //color of ambient light is black 0
         //color of spectral light is 1
                 
@@ -873,10 +869,24 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
     public double computeOpacity2DTF(double material_value, double material_r,
             double voxelValue, double gradMagnitude) {
 
-        double opacity = 0.0;
-
+        if (gradMagnitude == 0.0 && voxelValue == material_value)
+        {
+            return 1.0;
+        }
+        else
+        {
+            if(gradMagnitude>0 && voxelValue - (material_r*gradMagnitude) <= material_value && material_value <= voxelValue + (material_r*gradMagnitude))
+            {
+                return 1.0-((1.0/material_r)*Math.abs((material_value-voxelValue)/(gradMagnitude)));
+            }
+            else
+            {
+                return 0.0;
+            }
+        }
+            
         // TODO 8: Implement weight based opacity.
-        return opacity;
+        
     }
 
     /**
