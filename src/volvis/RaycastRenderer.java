@@ -645,7 +645,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                
                 foundColor = tFunc2DFront.color;
                 foundGradient.computeMag();
-                opacity = foundColor.a*computeOpacity2DTF(tFunc2DFront.baseIntensity,tFunc2DFront.radius,foundValue,foundGradient.mag); 
+                opacity = foundColor.a*computeOpacity2DTF(tFunc2DFront.baseIntensity,tFunc2DFront.radius,foundValue,foundGradient.mag);
 
                 
                 break;
@@ -868,6 +868,10 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
      */
     public double computeOpacity2DTF(double material_value, double material_r,
             double voxelValue, double gradMagnitude) {
+        
+        
+        double radius = material_r / gradients.getMaxGradientMagnitude();
+        
 
         if (gradMagnitude == 0.0 && voxelValue == material_value)
         {
@@ -875,9 +879,9 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         }
         else
         {
-            if(gradMagnitude>0 && voxelValue - (material_r*gradMagnitude) <= material_value && material_value <= voxelValue + (material_r*gradMagnitude))
+            if(gradMagnitude>0 && voxelValue - (radius*gradMagnitude) <= material_value && material_value <= voxelValue + (radius*gradMagnitude))
             {
-                return 1.0-((1.0/material_r)*Math.abs((material_value-voxelValue)/(gradMagnitude)));
+                return 1.0-((1.0/radius)*Math.abs((material_value-voxelValue)/(gradMagnitude)));
             }
             else
             {
