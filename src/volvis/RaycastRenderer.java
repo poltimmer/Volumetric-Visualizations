@@ -472,7 +472,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
      * @param sampleStep Sample step of the ray.
      * @return Color assigned to a ray/pixel.
      */
-    private int traceRayIso(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep) {
+    private int traceRayIso(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep, boolean isFront) {
 
         double[] lightVector = new double[3];
         //We define the light vector as directed toward the view point (which is the source of the light)
@@ -505,15 +505,32 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         short firstValue = getVoxelTrilinear(currentPos);
         boolean surfaceFound = false;
         
+        //back or front
+        
+        float isoValue;
+        TFColor isoColor;
+        
+        if(isFront)
+        {
+            isoValue = isoValueFront;
+            isoColor = isoColorFront;
+        }
+        else
+        {
+            isoValue = isoValueBack;
+            isoColor = isoColorBack;
+        }
+               
+        
         //We can detect the transion from below to above. But of course the first all values
         //can have the isovalue, in which case we would not detect it, so we check seperately.
-        if(firstValue == isoValueFront)
+        if(firstValue == isoValue)
         {
             surfaceFound = true;
         }
         else
         {
-            boolean potentialRisingEdge = firstValue < isoValueFront;
+            boolean potentialRisingEdge = firstValue < isoValue;
         
         
             //keep going untill we found surface or we have seen all samples
@@ -528,12 +545,12 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                 //see if we can see an transion, works only when going through the surface
                 if(potentialRisingEdge)
                 {
-                    surfaceFound = getVoxelTrilinear(currentPos) >= isoValueFront;
+                    surfaceFound = getVoxelTrilinear(currentPos) >= isoValue;
 
                 }
                 else
                 {
-                    surfaceFound = getVoxelTrilinear(currentPos) < isoValueFront;
+                    surfaceFound = getVoxelTrilinear(currentPos) < isoValue;
                 }
                 
             }
@@ -543,13 +560,13 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         {
             // isoColorFront contains the isosurface color from the GUI
             
-            TFColor color = isoColorFront;
+            TFColor color = isoColor;
             
             if(shadingMode)
             {
                 VoxelGradient gradient = getGradientTrilinear(currentPos);
             
-                color = computePhongShading(isoColorFront,gradient,lightVector,rayVector);
+                color = computePhongShading(isoColor,gradient,lightVector,rayVector);
             }
         
             
@@ -580,7 +597,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
      * @param sampleStep Sample step of the ray.
      * @return Color assigned to a ray/pixel.
      */
-    private int traceRayComposite(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep) {
+    private int traceRayComposite(double[] entryPoint, double[] exitPoint, double[] rayVector, double sampleStep, boolean isFront) {
         double[] lightVector = new double[3];
 
         //the light vector is directed toward the view point (which is the source of the light)
@@ -631,10 +648,24 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
             TFColor foundColor;
             
             // TODO 2: To be Implemented this function. Now, it just gives back a constant color depending on the mode
-            switch (modeFront) {
+            
+            TransferFunction tFunc;
+            TransferFunction2D tFunc2D;
+            RaycastMode mode;
+            if (isFront) {
+                tFunc = tFuncFront;
+                tFunc2D = tFunc2DFront;
+                mode = modeFront;
+            } else {
+                tFunc = tFuncBack;
+                tFunc2D = tFunc2DBack;
+                mode = modeBack;
+            }
+            
+            switch (mode) {
             case COMPOSITING:
                 // 1D transfer function 
-                foundColor = tFuncFront.getColor(foundValue);
+                foundColor = tFunc.getColor(foundValue);
                 opacity = foundColor.a;
                 break;
                 
@@ -643,9 +674,9 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                 // 2D transfer function 
                 
                
-                foundColor = tFunc2DFront.color;
+                foundColor = tFunc2D.color;
                 foundGradient.computeMag();
-                opacity = foundColor.a*computeOpacity2DTF(tFunc2DFront.baseIntensity,tFunc2DFront.radius,foundValue,foundGradient.mag);
+                opacity = foundColor.a*computeOpacity2DTF(tFunc2D.baseIntensity,tFunc2D.radius,foundValue,foundGradient.mag);
 
                 
                 break;
@@ -824,18 +855,34 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                 computeEntryAndExit(pixelCoord, rayVector, entryPoint, exitPoint);
 
                 // TODO 9: Implement logic for cutting plane.
+                RaycastMode raycastMode = modeFront;
+                boolean isFront = true;
+                
+                if(cuttingPlaneMode)
+                {
+                    double[] emptyVec = new double[3];
+                    double decider = VectorMath.dotproduct(planeNorm, VectorMath.difference(planePoint, entryPoint, emptyVec));
+                
+                    if (decider <= 0) {
+                        raycastMode = modeBack;
+                        isFront = false;
+                    } 
+                }
+                
+                
+                  
                 if ((entryPoint[0] > -1.0) && (exitPoint[0] > -1.0)) {
                     int val = 0;
-                    switch (modeFront) {
+                    switch (raycastMode) {
                         case COMPOSITING:
                         case TRANSFER2D:
-                            val = traceRayComposite(entryPoint, exitPoint, rayVector, sampleStep);
+                            val = traceRayComposite(entryPoint, exitPoint, rayVector, sampleStep, isFront);
                             break;
                         case MIP:
                             val = traceRayMIP(entryPoint, exitPoint, rayVector, sampleStep);
                             break;
                         case ISO_SURFACE:
-                            val = traceRayIso(entryPoint, exitPoint, rayVector, sampleStep);
+                            val = traceRayIso(entryPoint, exitPoint, rayVector, sampleStep,isFront);
                             break;
                     }
                     //when going low resolution there is the possiblily you draw outside the box, this is prevented.
