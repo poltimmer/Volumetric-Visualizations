@@ -54,7 +54,7 @@ public class GradientVolume {
      */
     private void compute() {
         // TODO 4: Implement gradient computation.
-        // first initialize to zero
+        // first initialize to zero, most of them overwriten later, but border is not
         for (int i = 0; i < data.length; i++) {
             data[i] = zero;
         }
@@ -62,11 +62,11 @@ public class GradientVolume {
         for(int i=1; i< dimX-1;i++){
             for(int j=1; j< dimY-1;j++){
                 for(int k=1; k< dimZ-1;k++){
-                    
+                    //using gradient computation as stated in levoys paper
                     //use 0.5 as float, double precision is not saved
-                    float x = (float) 0.5*(volume.getVoxel(i+1,j,k)-volume.getVoxel(i-1,j,k));
-                    float y = (float) 0.5*(volume.getVoxel(i,j+1,k)-volume.getVoxel(i,j-1,k));
-                    float z = (float) 0.5*(volume.getVoxel(i,j,k+1)-volume.getVoxel(i,j,k-1));
+                    float x = ((float) 0.5)*(volume.getVoxel(i+1,j,k)-volume.getVoxel(i-1,j,k));
+                    float y = ((float) 0.5)*(volume.getVoxel(i,j+1,k)-volume.getVoxel(i,j-1,k));
+                    float z = ((float) 0.5)*(volume.getVoxel(i,j,k+1)-volume.getVoxel(i,j,k-1));
                     
                     setGradient(i,j,k,new VoxelGradient(x,y,z));
                 }

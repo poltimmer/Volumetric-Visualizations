@@ -484,7 +484,6 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         double r, g, b;
         r = g = b = 0.0;
         double alpha = 0.0;
-        double opacity = 0;
         
         
         //compute the increment and the number of samples
@@ -562,6 +561,8 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
             
             TFColor color = isoColor;
             
+            //lets apply shading on this color
+            
             if(shadingMode)
             {
                 VoxelGradient gradient = getGradientTrilinear(currentPos);
@@ -577,7 +578,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
             alpha = 1.0;  
         }
               
-        //computes the color
+        //computes the color, note that pixels wihtout surface have a alpha of 0
         int color = computePackedPixelColor(r, g, b, alpha);
         return color;
     }
@@ -605,9 +606,6 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         VectorMath.setVector(lightVector, rayVector[0], rayVector[1], rayVector[2]);
 
         //Initialization of the colors as floating point values
-        double r, g, b;
-        r = g = b = 0.0;
-        double alpha = 0.0;
         double opacity = 0;
 
         TFColor voxel_color = new TFColor();
@@ -649,6 +647,8 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
             
             // TODO 2: To be Implemented this function. Now, it just gives back a constant color depending on the mode
             
+            //select input funtions from either front or back menu.
+            
             TransferFunction tFunc;
             TransferFunction2D tFunc2D;
             RaycastMode mode;
@@ -662,6 +662,8 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                 mode = modeBack;
             }
             
+            //compute selected mode.
+            
             switch (mode) {
             case COMPOSITING:
                 // 1D transfer function 
@@ -673,7 +675,7 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
             case TRANSFER2D:
                 // 2D transfer function 
                 
-               
+                //compute maginitude because this is not done automatically for each gradient object.
                 foundColor = tFunc2D.color;
                 foundGradient.computeMag();
                 opacity = foundColor.a*computeOpacity2DTF(tFunc2D.baseIntensity,tFunc2D.radius,foundValue,foundGradient.mag);
@@ -692,8 +694,12 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
             voxel_color.r = tauD * foundColor.r + (1-tauD)*voxel_color.r;
             voxel_color.g = tauD * foundColor.g + (1-tauD)*voxel_color.g;
             voxel_color.b = tauD * foundColor.b + (1-tauD)*voxel_color.b;
+            
+            //adding multiple opacities described as in floyd paper.
             voxel_color.a = voxel_color.a*(1-opacity);
-                    
+            
+            
+            //gradient only relevant for shading so check if we need to compute it
             if(shadingMode)
             {
                 voxel_gradient.x = tauF * foundGradient.x + (1-tauF)*voxel_gradient.x;
@@ -710,15 +716,15 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
              
 
         if (shadingMode) {
-            // Shading mode on
+            // Apply the shading, again magnitude has to be computed before its use.
             voxel_gradient.computeMag();
             voxel_color = computePhongShading(voxel_color,voxel_gradient,lightVector,rayVector);
         }
 
-        r = voxel_color.r;
-        g = voxel_color.g;
-        b = voxel_color.b;
-        alpha = 1-voxel_color.a;
+        double r = voxel_color.r;
+        double g = voxel_color.g;
+        double b = voxel_color.b;
+        double alpha = (1-voxel_color.a);
 
         //computes the color
         int color = computePackedPixelColor(r, g, b, alpha);
@@ -738,6 +744,9 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
     private TFColor computePhongShading(TFColor voxel_color, VoxelGradient gradient, double[] lightVector,
             double[] rayVector) {
         
+        //this function simply implements the matrix formula for the phong shading
+        //the same letters are used to indicate the different parts.
+        
         double kA = 0.1;
         double kD = 0.7;
         double kS = 0.2;
@@ -748,14 +757,12 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         float nY = gradient.y/gradient.mag;
         float nZ = gradient.z/gradient.mag;
         
-        double iDiff = kD * ((lightVector[0] * nX) + (lightVector[1] * nY)+(lightVector[2] * nZ)); //dotproduct n . light
+        double dn = (lightVector[0]*nX) + (lightVector[1]*nY) + (lightVector[2]*nZ); //dotproduct n . light
         
-        //r=d−2(d⋅n)n
+        double iDiff = kD * dn;
         
-        double dn = (lightVector[0]*nX) + (lightVector[1]*nY) + (lightVector[2]*nZ);
-        
-        double rX = lightVector[0] - 2*dn*nX;
-        double rY = lightVector[1] - 2*dn*nY;
+        double rX = lightVector[0] - 2*dn*nX;//mirror light around the n vector
+        double rY = lightVector[1] - 2*dn*nY;//r=d−2(d⋅n)n
         double rZ = lightVector[2] - 2*dn*nZ;
         
         
@@ -861,8 +868,10 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
                 if(cuttingPlaneMode)
                 {
                     double[] emptyVec = new double[3];
+                    //computing dotproduct
                     double decider = VectorMath.dotproduct(planeNorm, VectorMath.difference(planePoint, entryPoint, emptyVec));
-                
+                    
+                    //if decider is smaller then 0 it means the pixel is behind the plane
                     if (decider <= 0) {
                         raycastMode = modeBack;
                         isFront = false;
