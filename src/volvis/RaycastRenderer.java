@@ -638,29 +638,40 @@ public class RaycastRenderer extends Renderer implements TFChangeListener {
         colorAux.g = 0.0;
         colorAux.b = 0.0;
         colorAux.a = 0.0;
+        
+        //zero gradient
+        
+        VoxelGradient zero = new VoxelGradient();
+        
+        //select input funtions from either front or back menu.
+            
+        TransferFunction tFunc;
+        TransferFunction2D tFunc2D;
+        RaycastMode mode;
+        if (isFront) {
+            tFunc = tFuncFront;
+            tFunc2D = tFunc2DFront;
+            mode = modeFront;
+        } else {
+            tFunc = tFuncBack;
+            tFunc2D = tFunc2DBack;
+            mode = modeBack;
+        }
                 
                 
         do {
             short foundValue = getVoxelTrilinear(currentPos);
-            VoxelGradient foundGradient = getGradientTrilinear(currentPos);
+            VoxelGradient foundGradient = zero;
+            
+            //check if voxelgradient is even needed
+            if(shadingMode || mode == RaycastMode.TRANSFER2D)
+            {
+                foundGradient = getGradientTrilinear(currentPos);
+            }
             TFColor foundColor;
             
             // TODO 2: To be Implemented this function. Now, it just gives back a constant color depending on the mode
             
-            //select input funtions from either front or back menu.
-            
-            TransferFunction tFunc;
-            TransferFunction2D tFunc2D;
-            RaycastMode mode;
-            if (isFront) {
-                tFunc = tFuncFront;
-                tFunc2D = tFunc2DFront;
-                mode = modeFront;
-            } else {
-                tFunc = tFuncBack;
-                tFunc2D = tFunc2DBack;
-                mode = modeBack;
-            }
             
             //compute selected mode.
             
